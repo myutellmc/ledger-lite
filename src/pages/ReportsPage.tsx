@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
-import { Card, CardContent, CardHeader } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -43,30 +43,29 @@ export function ReportsPage() {
   const totalRevenue = sum(revenue)
   const totalExpenses = sum(expenses)
   const netIncome = totalRevenue - totalExpenses
-  const totalAssets = sum(assets)
   const totalLiabilities = sum(liabilities)
   const totalEquity = sum(equity)
 
-  function renderSection(title: string, accounts: AccountBalance[], subtotalLabel: string, highlight?: boolean) {
+  function Section({ title, accounts, label }: { title: string; accounts: AccountBalance[]; label: string }) {
     const total = sum(accounts)
     return (
       <div className="mb-6">
-        <div className="flex items-center justify-between py-2 border-b border-gray-200 mb-2">
-          <h3 className="font-semibold text-gray-800">{title}</h3>
+        <div className="flex items-center justify-between pb-2 mb-1" style={{ borderBottom: '1px solid var(--border-default)' }}>
+          <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>{title}</h3>
         </div>
         {accounts.length === 0 ? (
-          <p className="text-sm text-gray-400 py-2">No accounts</p>
-        ) : (
-          accounts.map(a => (
-            <div key={a.code} className="flex justify-between py-1.5 text-sm">
-              <span className="text-gray-600">{a.code} — {a.name}</span>
-              <span className="font-medium text-gray-900">{formatCurrency(a.balance)}</span>
-            </div>
-          ))
-        )}
-        <div className={`flex justify-between py-2 mt-1 border-t border-gray-200 ${highlight ? 'font-bold' : 'font-semibold'}`}>
-          <span className={highlight ? 'text-gray-900' : 'text-gray-700'}>{subtotalLabel}</span>
-          <span className={highlight ? (total >= 0 ? 'text-green-700' : 'text-red-700') : 'text-gray-900'}>{formatCurrency(total)}</span>
+          <p className="text-sm py-2" style={{ color: 'var(--text-muted)' }}>No accounts</p>
+        ) : accounts.map(a => (
+          <div key={a.code} className="flex justify-between py-1.5 text-sm">
+            <span style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-mono mr-2 text-xs" style={{ color: 'var(--text-muted)' }}>{a.code}</span>{a.name}
+            </span>
+            <span className="font-medium tabular-nums" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(a.balance)}</span>
+          </div>
+        ))}
+        <div className="flex justify-between py-2 mt-1 text-sm font-semibold" style={{ borderTop: '1px solid var(--border-default)' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+          <span style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(total)}</span>
         </div>
       </div>
     )
@@ -76,91 +75,93 @@ export function ReportsPage() {
     <div>
       <PageHeader title="Financial Reports" description="Profit & Loss, Balance Sheet, and Trial Balance" />
 
-      <div className="p-8 space-y-6">
+      <div className="p-8 space-y-5">
         <Card>
-          <CardContent className="flex items-center gap-4 py-4">
-            <div className="flex gap-2">
+          <div className="flex items-center gap-4 px-6 py-4">
+            <div className="flex gap-1.5 p-1 rounded-lg" style={{ background: 'var(--border-light)' }}>
               {(['pl', 'balance', 'trial'] as ReportType[]).map(r => (
-                <Button
+                <button
                   key={r}
-                  variant={report === r ? 'primary' : 'secondary'}
-                  size="sm"
                   onClick={() => setReport(r)}
+                  className="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all"
+                  style={{
+                    background: report === r ? 'white' : 'transparent',
+                    color: report === r ? 'var(--text-primary)' : 'var(--text-muted)',
+                    boxShadow: report === r ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                  }}
                 >
                   {r === 'pl' ? 'Profit & Loss' : r === 'balance' ? 'Balance Sheet' : 'Trial Balance'}
-                </Button>
+                </button>
               ))}
             </div>
-            <div className="flex items-center gap-3 ml-auto">
+            <div className="flex items-center gap-2 ml-auto">
               <Input label="" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-36" />
-              <span className="text-gray-400 text-sm">to</span>
+              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>to</span>
               <Input label="" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-36" />
               <Button size="sm" variant="secondary" onClick={runReport}>Refresh</Button>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {loading ? (
-          <div className="text-center py-10 text-sm text-gray-400">Generating report...</div>
+          <div className="text-center py-10 text-sm" style={{ color: 'var(--text-muted)' }}>Generating report...</div>
         ) : (
           <div className="max-w-2xl">
             {report === 'pl' && (
               <Card>
-                <CardHeader>
-                  <h2 className="text-lg font-semibold text-gray-900">Profit & Loss Statement</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">{dateFrom} to {dateTo}</p>
-                </CardHeader>
-                <CardContent>
-                  {renderSection('Revenue', revenue, 'Total Revenue')}
-                  {renderSection('Expenses', expenses, 'Total Expenses')}
-                  <div className={`flex justify-between py-3 border-t-2 border-gray-300 font-bold text-base`}>
-                    <span className="text-gray-900">Net Income</span>
-                    <span className={netIncome >= 0 ? 'text-green-700' : 'text-red-700'}>{formatCurrency(netIncome)}</span>
+                <div className="px-6 pt-6 pb-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Profit & Loss Statement</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{dateFrom} to {dateTo}</p>
+                </div>
+                <div className="px-6 py-5">
+                  <Section title="Revenue" accounts={revenue} label="Total Revenue" />
+                  <Section title="Expenses" accounts={expenses} label="Total Expenses" />
+                  <div className="flex justify-between py-3 text-base font-bold" style={{ borderTop: '2px solid var(--border-default)' }}>
+                    <span style={{ color: 'var(--text-primary)' }}>Net Income</span>
+                    <span style={{ color: netIncome >= 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(netIncome)}</span>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             )}
 
             {report === 'balance' && (
               <Card>
-                <CardHeader>
-                  <h2 className="text-lg font-semibold text-gray-900">Balance Sheet</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">As at {dateTo}</p>
-                </CardHeader>
-                <CardContent>
-                  {renderSection('Assets', assets, 'Total Assets')}
-                  {renderSection('Liabilities', liabilities, 'Total Liabilities')}
-                  {renderSection('Equity', equity, 'Total Equity')}
-                  <div className="flex justify-between py-3 border-t-2 border-gray-300 font-bold text-base">
-                    <span className="text-gray-900">Total Liabilities + Equity</span>
-                    <span className={Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 1 ? 'text-green-700' : 'text-red-600'}>
-                      {formatCurrency(totalLiabilities + totalEquity)}
-                    </span>
+                <div className="px-6 pt-6 pb-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Balance Sheet</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>As at {dateTo}</p>
+                </div>
+                <div className="px-6 py-5">
+                  <Section title="Assets" accounts={assets} label="Total Assets" />
+                  <Section title="Liabilities" accounts={liabilities} label="Total Liabilities" />
+                  <Section title="Equity" accounts={equity} label="Total Equity" />
+                  <div className="flex justify-between py-3 text-base font-bold" style={{ borderTop: '2px solid var(--border-default)' }}>
+                    <span style={{ color: 'var(--text-primary)' }}>Total Liabilities + Equity</span>
+                    <span style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(totalLiabilities + totalEquity)}</span>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             )}
 
             {report === 'trial' && (
               <Card>
-                <CardHeader>
-                  <h2 className="text-lg font-semibold text-gray-900">Trial Balance</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">As at {dateTo}</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-3 py-2 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    <span className="col-span-1">Code</span>
-                    <span className="col-span-2">Account</span>
-                    <span className="col-span-1 text-right">Balance</span>
+                <div className="px-6 pt-6 pb-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Trial Balance</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>As at {dateTo}</p>
+                </div>
+                <div className="px-6 py-5">
+                  <div className="flex gap-4 pb-2 mb-1 text-xs font-semibold uppercase tracking-wide" style={{ borderBottom: '1px solid var(--border-default)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+                    <span className="w-16">Code</span>
+                    <span className="flex-1">Account</span>
+                    <span className="text-right w-28">Balance</span>
                   </div>
                   {data.map(a => (
-                    <div key={a.code} className="grid grid-cols-4 gap-3 py-1.5 text-sm border-b border-gray-50">
-                      <span className="col-span-1 font-mono text-gray-500">{a.code}</span>
-                      <span className="col-span-2 text-gray-800">{a.name}</span>
-                      <span className={`col-span-1 text-right font-medium ${a.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(a.balance)}</span>
+                    <div key={a.code} className="flex gap-4 py-1.5 text-sm" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <span className="w-16 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{a.code}</span>
+                      <span className="flex-1" style={{ color: 'var(--text-secondary)' }}>{a.name}</span>
+                      <span className="w-28 text-right font-medium" style={{ color: a.balance < 0 ? '#dc2626' : 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(a.balance)}</span>
                     </div>
                   ))}
-                </CardContent>
+                </div>
               </Card>
             )}
           </div>

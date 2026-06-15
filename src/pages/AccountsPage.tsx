@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { DataTable, TableHead, TableBody, DataRow, Th, Td, EmptyState } from '@/components/ui/TableRow'
 import { useAuth } from '@/contexts/AuthContext'
 import { Plus, ChevronRight, ChevronDown } from 'lucide-react'
 import type { AccountType } from '@/lib/database.types'
@@ -22,15 +23,15 @@ interface Account {
   balance: number
 }
 
-const TYPE_COLORS: Record<AccountType, string> = {
-  asset: 'bg-blue-50 text-blue-700',
-  liability: 'bg-red-50 text-red-700',
-  equity: 'bg-purple-50 text-purple-700',
-  revenue: 'bg-green-50 text-green-700',
-  expense: 'bg-orange-50 text-orange-700',
+const TYPE_BADGE: Record<AccountType, { variant: 'info' | 'danger' | 'default' | 'success' | 'warning' }> = {
+  asset: { variant: 'info' },
+  liability: { variant: 'danger' },
+  equity: { variant: 'default' },
+  revenue: { variant: 'success' },
+  expense: { variant: 'warning' },
 }
 
-const ACCOUNT_TYPES: { value: string; label: string }[] = [
+const ACCOUNT_TYPES = [
   { value: 'asset', label: 'Asset' },
   { value: 'liability', label: 'Liability' },
   { value: 'equity', label: 'Equity' },
@@ -59,12 +60,8 @@ export function AccountsPage() {
     e.preventDefault()
     setSaving(true)
     await supabase.from('accounts').insert({
-      code: form.code,
-      name: form.name,
-      type: form.type,
-      parent_id: form.parent_id || null,
-      description: form.description || null,
-      is_active: true,
+      code: form.code, name: form.name, type: form.type,
+      parent_id: form.parent_id || null, description: form.description || null, is_active: true,
     })
     setSaving(false)
     setShowForm(false)
@@ -76,36 +73,33 @@ export function AccountsPage() {
   const children = (parentId: string) => accounts.filter(a => a.parent_id === parentId)
 
   function toggle(id: string) {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  function renderAccount(account: Account, depth = 0) {
+  function renderAccount(account: Account, depth = 0): React.ReactNode {
     const kids = children(account.id)
-    const isExpanded = expanded.has(account.id)
-    return (
-      <div key={account.id}>
-        <div
-          className={`flex items-center gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${depth > 0 ? 'pl-' + (4 + depth * 4) : ''}`}
-          style={{ paddingLeft: `${16 + depth * 20}px` }}
-        >
-          <button onClick={() => kids.length > 0 && toggle(account.id)} className="w-4 h-4 shrink-0 flex items-center justify-center">
-            {kids.length > 0 ? (isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />) : null}
-          </button>
-          <span className="w-20 text-xs font-mono text-gray-500">{account.code}</span>
-          <span className="flex-1 text-sm font-medium text-gray-900">{account.name}</span>
-          <span className={`text-xs px-2 py-0.5 rounded font-medium ${TYPE_COLORS[account.type]}`}>
-            {account.type}
-          </span>
-          <span className="w-28 text-right text-sm font-medium text-gray-900">{formatCurrency(account.balance)}</span>
-          <Badge variant={account.is_active ? 'success' : 'neutral'}>{account.is_active ? 'Active' : 'Inactive'}</Badge>
-        </div>
-        {isExpanded && kids.map(child => renderAccount(child, depth + 1))}
-      </div>
-    )
+    const isExp = expanded.has(account.id)
+    return [
+      <DataRow key={account.id}>
+        <Td>
+          <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 20}px` }}>
+            <button
+              onClick={() => kids.length > 0 && toggle(account.id)}
+              className="w-5 h-5 shrink-0 flex items-center justify-center rounded"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {kids.length > 0 ? (isExp ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />) : <span className="w-3.5" />}
+            </button>
+            <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{account.code}</span>
+          </div>
+        </Td>
+        <Td style={{ color: 'var(--text-primary)', fontWeight: depth === 0 ? 600 : 500 }}>{account.name}</Td>
+        <Td><Badge variant={TYPE_BADGE[account.type].variant}>{account.type}</Badge></Td>
+        <Td right mono style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(account.balance)}</Td>
+        <Td><Badge variant={account.is_active ? 'success' : 'neutral'}>{account.is_active ? 'Active' : 'Inactive'}</Badge></Td>
+      </DataRow>,
+      ...(isExp ? kids.map(c => renderAccount(c, depth + 1)) : [])
+    ]
   }
 
   return (
@@ -113,22 +107,20 @@ export function AccountsPage() {
       <PageHeader
         title="Chart of Accounts"
         description="Manage your account structure for double-entry bookkeeping"
-        actions={
-          isAccountant && (
-            <Button onClick={() => setShowForm(!showForm)} size="sm">
-              <Plus className="w-4 h-4" /> New Account
-            </Button>
-          )
-        }
+        actions={isAccountant && (
+          <Button onClick={() => setShowForm(!showForm)} size="sm">
+            <Plus className="w-3.5 h-3.5" /> New Account
+          </Button>
+        )}
       />
 
-      <div className="p-8 space-y-6">
+      <div className="p-8 space-y-5">
         {showForm && (
           <Card>
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="font-medium text-gray-900">Add Account</h3>
+            <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Add Account</h3>
             </div>
-            <form onSubmit={handleSave} className="px-6 py-4 grid grid-cols-3 gap-4">
+            <form onSubmit={handleSave} className="px-6 py-5 grid grid-cols-3 gap-4">
               <Input label="Account Code" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="1000" required />
               <Input label="Account Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Cash" required />
               <Select label="Type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as AccountType }))} options={ACCOUNT_TYPES} />
@@ -149,21 +141,24 @@ export function AccountsPage() {
         )}
 
         <Card>
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-xl">
-            <span className="w-4" />
-            <span className="w-20 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</span>
-            <span className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</span>
-            <span className="w-20 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</span>
-            <span className="w-28 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Balance</span>
-            <span className="w-16 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</span>
-          </div>
-          {loading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-400">Loading accounts...</div>
-          ) : roots.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-400">No accounts yet. Add your first account above.</div>
-          ) : (
-            roots.map(a => renderAccount(a))
-          )}
+          <DataTable>
+            <TableHead>
+              <Th>Code</Th>
+              <Th>Account Name</Th>
+              <Th>Type</Th>
+              <Th right>Balance</Th>
+              <Th>Status</Th>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading accounts...</td></tr>
+              ) : roots.length === 0 ? (
+                <EmptyState title="No accounts yet" description="Add your first account using the button above" />
+              ) : (
+                roots.map(a => renderAccount(a))
+              )}
+            </TableBody>
+          </DataTable>
         </Card>
       </div>
     </div>

@@ -6,33 +6,41 @@ interface BadgeProps {
   variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 }
 
-const variants = {
-  default: 'bg-primary-100 text-primary-700',
-  success: 'bg-green-100 text-green-700',
-  warning: 'bg-yellow-100 text-yellow-700',
-  danger: 'bg-red-100 text-red-700',
-  info: 'bg-blue-100 text-blue-700',
-  neutral: 'bg-gray-100 text-gray-600',
+const variants: Record<string, string> = {
+  default: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+  success: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  warning: 'bg-amber-50 text-amber-700 ring-amber-200',
+  danger:  'bg-red-50 text-red-600 ring-red-200',
+  info:    'bg-sky-50 text-sky-700 ring-sky-200',
+  neutral: 'bg-slate-100 text-slate-600 ring-slate-200',
 }
 
-export function Badge({ children, className, variant = 'default' }: BadgeProps) {
+export function Badge({ children, className, variant = 'neutral' }: BadgeProps) {
   return (
-    <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-xs font-medium', variants[variant], className)}>
+    <span
+      className={cn(
+        'inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset',
+        variants[variant],
+        className,
+      )}
+    >
       {children}
     </span>
   )
 }
 
-export function statusBadge(status: string) {
-  const map: Record<string, BadgeProps['variant']> = {
-    draft: 'neutral',
-    sent: 'info',
-    paid: 'success',
-    overdue: 'danger',
+type BadgeVariant = BadgeProps['variant']
+
+export function statusBadge(status: string): { variant: BadgeVariant } {
+  const map: Record<string, BadgeVariant> = {
+    draft:     'neutral',
+    sent:      'info',
+    paid:      'success',
+    overdue:   'danger',
     cancelled: 'neutral',
-    received: 'warning',
-    active: 'success',
-    inactive: 'neutral',
+    received:  'warning',
+    active:    'success',
+    inactive:  'neutral',
   }
-  return { variant: map[status] ?? 'neutral' as BadgeProps['variant'] }
+  return { variant: map[status] ?? 'neutral' }
 }

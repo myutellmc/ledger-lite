@@ -8,12 +8,27 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
-    <div className="flex items-start justify-between px-8 py-6 border-b border-gray-200 bg-white">
+    <div
+      className="flex items-center justify-between px-8 py-5"
+      style={{
+        background: 'var(--card-bg)',
+        borderBottom: '1px solid var(--border-default)',
+      }}
+    >
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
-        {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
+        <h1
+          className="font-semibold leading-tight"
+          style={{ fontSize: '16px', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}
+        >
+          {title}
+        </h1>
+        {description && (
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {description}
+          </p>
+        )}
       </div>
-      {actions && <div className="flex items-center gap-3">{actions}</div>}
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
   )
 }
