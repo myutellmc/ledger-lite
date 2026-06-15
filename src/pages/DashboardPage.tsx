@@ -79,7 +79,7 @@ export function DashboardPage() {
         .map(i => ({
           id: i.number,
           number: i.number,
-          contact: (i.contacts as { name: string } | null)?.name ?? 'Unknown',
+          contact: (i.contacts as unknown as { name: string } | null)?.name ?? 'Unknown',
           total: i.total,
           status: i.status,
           due_date: i.due_date,
