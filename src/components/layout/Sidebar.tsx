@@ -11,13 +11,17 @@ import {
   Settings,
   LogOut,
   TrendingDown,
+  ClipboardList,
+  Banknote,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/accounts', icon: BookOpen, label: 'Chart of Accounts' },
   { to: '/journal', icon: FileText, label: 'Journal Entries' },
+  { to: '/quotes', icon: ClipboardList, label: 'Quotes' },
   { to: '/invoices', icon: Receipt, label: 'Invoices' },
+  { to: '/payments', icon: Banknote, label: 'Payments' },
   { to: '/bills', icon: CreditCard, label: 'Bills' },
   { to: '/expenses', icon: TrendingDown, label: 'Expenses' },
   { to: '/contacts', icon: Users, label: 'Contacts' },
@@ -41,14 +45,24 @@ export function Sidebar() {
       <div className="px-4 py-5" style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
         <div className="flex items-center gap-2.5">
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: '#1e1b4b' }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <rect x="1" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
-              <rect x="7" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.6" />
-              <rect x="1" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.6" />
-              <rect x="7" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              {/* pivot post */}
+              <rect x="9.25" y="11" width="1.5" height="6" rx="0.75" fill="#fbbf24"/>
+              {/* base */}
+              <rect x="6" y="16" width="8" height="1.5" rx="0.75" fill="rgba(251,191,36,0.4)"/>
+              {/* beam */}
+              <rect x="3.5" y="8.5" width="13" height="1.5" rx="0.75" fill="#fbbf24"/>
+              {/* left arm */}
+              <line x1="4.5" y1="10" x2="3.5" y2="13.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="1" y="13" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              {/* right arm — slightly higher */}
+              <line x1="15.5" y1="10" x2="16.5" y2="12.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="14" y="12" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              {/* pivot dot */}
+              <circle cx="10" cy="8.5" r="1.5" fill="#fde68a"/>
             </svg>
           </div>
           <div>

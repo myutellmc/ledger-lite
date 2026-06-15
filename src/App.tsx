@@ -7,7 +7,9 @@ import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { JournalPage } from '@/pages/JournalPage'
+import { QuotesPage } from '@/pages/QuotesPage'
 import { InvoicesPage } from '@/pages/InvoicesPage'
+import { PaymentsPage } from '@/pages/PaymentsPage'
 import { BillsPage } from '@/pages/BillsPage'
 import { ExpensesPage } from '@/pages/ExpensesPage'
 import { ContactsPage } from '@/pages/ContactsPage'
@@ -32,7 +34,9 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="accounts" element={<AccountsPage />} />
             <Route path="journal" element={<JournalPage />} />
+            <Route path="quotes" element={<QuotesPage />} />
             <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="payments" element={<PaymentsPage />} />
             <Route path="bills" element={<BillsPage />} />
             <Route path="expenses" element={<ExpensesPage />} />
             <Route path="contacts" element={<ContactsPage />} />
