@@ -80,16 +80,25 @@ export function LoginPage() {
         style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', boxShadow: '0 0 0 1px rgba(99,102,241,0.25)' }}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+            style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', boxShadow: '0 0 0 1px rgba(99,102,241,0.3), 0 4px 16px rgba(99,102,241,0.2)' }}
           >
-            <LedgerIcon />
+            <svg width="30" height="30" viewBox="0 0 20 20" fill="none">
+              <rect x="9.25" y="11" width="1.5" height="6" rx="0.75" fill="#fbbf24"/>
+              <rect x="6" y="16" width="8" height="1.5" rx="0.75" fill="rgba(251,191,36,0.4)"/>
+              <rect x="3.5" y="8.5" width="13" height="1.5" rx="0.75" fill="#fbbf24"/>
+              <line x1="4.5" y1="10" x2="3.5" y2="13.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="1" y="13" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              <line x1="15.5" y1="10" x2="16.5" y2="12.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="14" y="12" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              <circle cx="10" cy="8.5" r="1.5" fill="#fde68a"/>
+            </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold leading-tight" style={{ color: '#f1f5f9', letterSpacing: '-0.02em' }}>Ledger Lite</p>
-            <p className="text-xs leading-tight mt-0.5" style={{ color: 'rgba(148,163,184,0.45)' }}>Zambia · ZMW · ZRA Compliant</p>
+            <p className="text-xl font-bold leading-tight" style={{ color: '#f1f5f9', letterSpacing: '-0.03em' }}>Ledger Lite</p>
+            <p className="text-sm leading-tight mt-1" style={{ color: 'rgba(148,163,184,0.55)' }}>Zambia · ZMW · ZRA Compliant</p>
           </div>
         </div>
 
