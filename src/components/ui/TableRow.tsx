@@ -11,11 +11,11 @@ export function Th({ children, className, right }: { children?: React.ReactNode;
   )
 }
 
-export function Td({ children, className, right, mono }: { children?: React.ReactNode; className?: string; right?: boolean; mono?: boolean }) {
+export function Td({ children, className, right, mono, style }: { children?: React.ReactNode; className?: string; right?: boolean; mono?: boolean; style?: React.CSSProperties }) {
   return (
     <td
       className={cn('px-5 py-3.5 text-sm', right && 'text-right', mono && 'font-mono', className)}
-      style={{ color: 'var(--text-secondary)' }}
+      style={{ color: 'var(--text-secondary)', ...style }}
     >
       {children}
     </td>
@@ -62,10 +62,12 @@ export function TableBody({ children }: { children: React.ReactNode }) {
   return <tbody className="divide-y" style={{ borderColor: 'var(--border-light)' }}>{children}</tbody>
 }
 
-export function DataRow({ children, className }: { children: React.ReactNode; className?: string }) {
+export function DataRow({ children, className, onClick, style }: { children: React.ReactNode; className?: string; onClick?: () => void; style?: React.CSSProperties }) {
   return (
     <tr
       className={cn('transition-colors duration-75 hover:bg-slate-50/70', className)}
+      onClick={onClick}
+      style={style}
     >
       {children}
     </tr>

@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge, statusBadge } from '@/components/ui/Badge'
+import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, TableHead, TableBody, DataRow, Th, Td, EmptyState } from '@/components/ui/TableRow'
 import { useAuth } from '@/contexts/AuthContext'
-import { Plus, Search, FileText } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
+import { SendQuoteModal } from '@/components/ui/SendQuoteModal'
+import { Plus, Search, FileText, Printer, Package, X } from 'lucide-react'
 
 type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'invoiced'
 
@@ -22,7 +25,15 @@ interface Quote {
   status: QuoteStatus
   total: number
   invoice_id: string | null
-  contacts: { name: string } | null
+  customer_token: string
+  customer_email: string | null
+  contacts: { name: string; email: string | null } | null
+}
+
+interface Settings {
+  company_name: string
+  tax_label: string
+  default_tax_rate: number
 }
 
 const STATUS_OPTIONS = [
@@ -46,26 +57,33 @@ const QUOTE_STATUS_BADGE: Record<QuoteStatus, { variant: 'neutral' | 'info' | 's
 
 export function QuotesPage() {
   const { isAccountant, user } = useAuth()
+  const toast = useToast()
   const [quotes, setQuotes] = useState<Quote[]>([])
-  const [contacts, setContacts] = useState<{ id: string; name: string }[]>([])
+  const [contacts, setContacts] = useState<{ id: string; name: string; email: string | null }[]>([])
+  const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [converting, setConverting] = useState<string | null>(null)
+  const [sendingQuote, setSendingQuote] = useState<Quote | null>(null)
+  const [taxEnabled, setTaxEnabled] = useState(true)
+  const [products, setProducts] = useState<{ id: string; name: string; sku: string | null; selling_price: number; stock_qty: number; unit: string }[]>([])
+  const [pickerRow, setPickerRow] = useState<number | null>(null)
+  const [pickerSearch, setPickerSearch] = useState('')
   const [form, setForm] = useState({
     contact_id: '',
     issue_date: new Date().toISOString().split('T')[0],
     expiry_date: '',
     notes: '',
-    items: [{ description: '', quantity: 1, unit_price: 0, tax_rate: 0 }],
+    items: [{ description: '', quantity: 1, unit_price: 0, product_id: null as string | null }],
   })
 
   async function load() {
     const { data } = await supabase
       .from('quotes')
-      .select('*, contacts(name)')
+      .select('*, contacts(name, email)')
       .order('created_at', { ascending: false })
     setQuotes(data ?? [])
     setLoading(false)
@@ -73,11 +91,19 @@ export function QuotesPage() {
 
   useEffect(() => {
     load()
-    supabase.from('contacts').select('id, name').then(({ data }) => setContacts(data ?? []))
+    supabase.from('contacts').select('id, name, email').then(({ data }) => setContacts(data ?? []))
+    supabase.from('products').select('id, name, sku, selling_price, stock_qty, unit').eq('is_active', true).order('name').then(({ data }) => setProducts(data ?? []))
+    supabase.from('settings').select('company_name, tax_label, default_tax_rate').single().then(({ data }) => {
+      if (data) {
+        setSettings(data as Settings)
+        setTaxEnabled(true)
+      }
+    })
   }, [])
 
   const subtotal = form.items.reduce((s, i) => s + i.quantity * i.unit_price, 0)
-  const taxAmount = form.items.reduce((s, i) => s + i.quantity * i.unit_price * i.tax_rate / 100, 0)
+  const effectiveTaxRate = taxEnabled ? (settings?.default_tax_rate ?? 16) : 0
+  const taxAmount = subtotal * effectiveTaxRate / 100
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -91,6 +117,7 @@ export function QuotesPage() {
       subtotal,
       tax_amount: taxAmount,
       total: subtotal + taxAmount,
+      tax_enabled: taxEnabled,
       notes: form.notes || null,
       created_by: user.id,
     }).select().single()
@@ -101,14 +128,18 @@ export function QuotesPage() {
           description: item.description,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          tax_rate: item.tax_rate,
+          tax_rate: effectiveTaxRate,
           amount: item.quantity * item.unit_price,
+          product_id: item.product_id ?? null,
         }))
       )
+      toast.success('Quote saved', `${(quote as { number: string }).number} created as draft`)
     }
     setSaving(false)
     setShowForm(false)
-    setForm({ contact_id: '', issue_date: new Date().toISOString().split('T')[0], expiry_date: '', notes: '', items: [{ description: '', quantity: 1, unit_price: 0, tax_rate: 0 }] })
+    setForm({ contact_id: '', issue_date: new Date().toISOString().split('T')[0], expiry_date: '', notes: '', items: [{ description: '', quantity: 1, unit_price: 0, product_id: null }] })
+    setTaxEnabled(true)
+    setPickerRow(null)
     load()
   }
 
@@ -120,11 +151,7 @@ export function QuotesPage() {
   async function convertToInvoice(quote: Quote) {
     if (!user || quote.invoice_id) return
     setConverting(quote.id)
-
-    // Load quote items
     const { data: items } = await supabase.from('quote_items').select('*').eq('quote_id', quote.id)
-
-    // Create invoice
     const { data: invoice } = await supabase.from('invoices').insert({
       contact_id: quote.contact_id,
       issue_date: new Date().toISOString().split('T')[0],
@@ -133,10 +160,10 @@ export function QuotesPage() {
       subtotal: quote.total - (quote as unknown as { tax_amount: number }).tax_amount,
       tax_amount: (quote as unknown as { tax_amount: number }).tax_amount,
       total: quote.total,
+      tax_enabled: (quote as unknown as { tax_enabled: boolean }).tax_enabled ?? true,
       notes: null,
       created_by: user.id,
     }).select().single()
-
     if (invoice && items) {
       await supabase.from('invoice_items').insert(
         items.map((item: { description: string; quantity: number; unit_price: number; tax_rate: number; amount: number }) => ({
@@ -148,8 +175,8 @@ export function QuotesPage() {
           amount: item.amount,
         }))
       )
-      // Mark quote as invoiced and link it
       await supabase.from('quotes').update({ status: 'invoiced', invoice_id: (invoice as { id: string }).id }).eq('id', quote.id)
+      toast.success('Invoice created', 'Quote converted to draft invoice')
     }
     setConverting(null)
     load()
@@ -160,6 +187,7 @@ export function QuotesPage() {
     .filter(q => !search || q.number.toLowerCase().includes(search.toLowerCase()) || q.contacts?.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
+    <>
     <div>
       <PageHeader
         title="Quotes"
@@ -187,27 +215,103 @@ export function QuotesPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Line Items</p>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm(f => ({ ...f, items: [...f.items, { description: '', quantity: 1, unit_price: 0, tax_rate: 0 }] }))}>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm(f => ({ ...f, items: [...f.items, { description: '', quantity: 1, unit_price: 0, product_id: null }] }))}>
                     <Plus className="w-3.5 h-3.5" /> Add line
                   </Button>
                 </div>
                 <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-default)' }}>
-                  <div className="grid grid-cols-12 gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide" style={{ background: '#f8fafc', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-default)' }}>
-                    <span className="col-span-5">Description</span><span className="col-span-2 text-right">Qty</span><span className="col-span-2 text-right">Unit price</span><span className="col-span-2 text-right">Tax %</span><span className="col-span-1 text-right">Amount</span>
+                  <div className="grid grid-cols-12 gap-2 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide" style={{ background: '#f8fafc', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-default)' }}>
+                    <span className="col-span-1"></span><span className="col-span-5">Description</span><span className="col-span-2 text-right">Qty</span><span className="col-span-2 text-right">Unit price</span><span className="col-span-1 text-right">Amount</span><span className="col-span-1"></span>
                   </div>
                   {form.items.map((item, i) => (
-                    <div key={i} className="grid grid-cols-12 gap-3 px-4 py-2.5" style={{ borderTop: i > 0 ? '1px solid var(--border-light)' : 'none' }}>
+                    <div key={i} className="grid grid-cols-12 gap-2 px-4 py-2" style={{ borderTop: i > 0 ? '1px solid var(--border-light)' : 'none', position: 'relative' }}>
+                      {/* Product picker button */}
+                      <div className="col-span-1 flex items-center" style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          title="Pick from inventory"
+                          onClick={() => { setPickerRow(pickerRow === i ? null : i); setPickerSearch('') }}
+                          className="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+                          style={{ background: item.product_id ? '#ede9fe' : '#f1f5f9', color: item.product_id ? '#7c3aed' : '#94a3b8', border: `1px solid ${item.product_id ? '#c4b5fd' : '#e2e8f0'}` }}
+                        >
+                          <Package className="w-3.5 h-3.5" />
+                        </button>
+                        {/* Dropdown */}
+                        {pickerRow === i && (
+                          <div className="absolute left-0 top-9 z-50 w-72 rounded-xl shadow-2xl overflow-hidden" style={{ background: 'white', border: '1px solid var(--border-default)' }}>
+                            <div className="p-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                              <input
+                                autoFocus
+                                className="w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                style={{ background: '#f8fafc', border: '1px solid var(--border-default)', color: 'var(--text-primary)' }}
+                                placeholder="Search products…"
+                                value={pickerSearch}
+                                onChange={e => setPickerSearch(e.target.value)}
+                              />
+                            </div>
+                            <div className="max-h-52 overflow-y-auto">
+                              {products
+                                .filter(p => !pickerSearch || p.name.toLowerCase().includes(pickerSearch.toLowerCase()) || (p.sku ?? '').toLowerCase().includes(pickerSearch.toLowerCase()))
+                                .map(p => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 transition-colors border-b last:border-0"
+                                    style={{ borderColor: 'var(--border-light)' }}
+                                    onClick={() => {
+                                      const items = [...form.items]
+                                      items[i] = { ...items[i], description: p.name, unit_price: p.selling_price, product_id: p.id }
+                                      setForm(f => ({ ...f, items }))
+                                      setPickerRow(null)
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
+                                      <span className="text-xs font-semibold" style={{ color: '#2563eb' }}>{formatCurrency(p.selling_price)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      {p.sku && <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{p.sku}</span>}
+                                      <span className="text-xs" style={{ color: p.stock_qty <= 0 ? '#dc2626' : p.stock_qty <= 5 ? '#d97706' : '#16a34a' }}>
+                                        {p.stock_qty} {p.unit} in stock
+                                      </span>
+                                    </div>
+                                  </button>
+                                ))}
+                              {products.filter(p => !pickerSearch || p.name.toLowerCase().includes(pickerSearch.toLowerCase()) || (p.sku ?? '').toLowerCase().includes(pickerSearch.toLowerCase())).length === 0 && (
+                                <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--text-muted)' }}>No products found</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <input className="col-span-5 text-sm bg-transparent border-0 outline-none" style={{ color: 'var(--text-primary)' }} placeholder="Description" value={item.description} onChange={e => { const items = [...form.items]; items[i] = { ...items[i], description: e.target.value }; setForm(f => ({ ...f, items })) }} required />
                       <input className="col-span-2 text-sm text-right bg-transparent border-0 outline-none" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }} type="number" min="1" value={item.quantity} onChange={e => { const items = [...form.items]; items[i] = { ...items[i], quantity: +e.target.value }; setForm(f => ({ ...f, items })) }} />
                       <input className="col-span-2 text-sm text-right bg-transparent border-0 outline-none" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }} type="number" min="0" step="0.01" value={item.unit_price} onChange={e => { const items = [...form.items]; items[i] = { ...items[i], unit_price: +e.target.value }; setForm(f => ({ ...f, items })) }} />
-                      <input className="col-span-2 text-sm text-right bg-transparent border-0 outline-none" style={{ color: 'var(--text-primary)' }} type="number" min="0" max="100" value={item.tax_rate} onChange={e => { const items = [...form.items]; items[i] = { ...items[i], tax_rate: +e.target.value }; setForm(f => ({ ...f, items })) }} />
                       <span className="col-span-1 text-sm text-right font-medium" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(item.quantity * item.unit_price)}</span>
+                      <button type="button" className="col-span-1 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity" onClick={() => { if (form.items.length === 1) return; const items = form.items.filter((_, j) => j !== i); setForm(f => ({ ...f, items })) }}>
+                        <X className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />
+                      </button>
                     </div>
                   ))}
-                  <div className="flex justify-end gap-6 px-4 py-3 text-sm" style={{ borderTop: '1px solid var(--border-default)', background: '#f8fafc' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Subtotal <span className="font-semibold ml-2" style={{ color: 'var(--text-primary)' }}>{formatCurrency(subtotal)}</span></span>
-                    <span style={{ color: 'var(--text-muted)' }}>Tax <span className="font-semibold ml-2" style={{ color: 'var(--text-primary)' }}>{formatCurrency(taxAmount)}</span></span>
-                    <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Total {formatCurrency(subtotal + taxAmount)}</span>
+                  <div className="flex items-center justify-between px-4 py-3 text-sm" style={{ borderTop: '1px solid var(--border-default)', background: '#f8fafc' }}>
+                    {/* VAT toggle */}
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <div
+                        className="relative w-9 h-5 rounded-full transition-colors"
+                        style={{ background: taxEnabled ? '#16a34a' : '#cbd5e1' }}
+                        onClick={() => setTaxEnabled(t => !t)}
+                      >
+                        <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" style={{ transform: taxEnabled ? 'translateX(18px)' : 'translateX(2px)' }} />
+                      </div>
+                      <span className="text-xs font-medium" style={{ color: taxEnabled ? '#16a34a' : 'var(--text-muted)' }}>
+                        {settings?.tax_label ?? 'VAT'} ({settings?.default_tax_rate ?? 16}%)
+                      </span>
+                    </label>
+                    <div className="flex gap-6">
+                      <span style={{ color: 'var(--text-muted)' }}>Subtotal <span className="font-semibold ml-2" style={{ color: 'var(--text-primary)' }}>{formatCurrency(subtotal)}</span></span>
+                      {taxEnabled && <span style={{ color: 'var(--text-muted)' }}>{settings?.tax_label ?? 'VAT'} <span className="font-semibold ml-2" style={{ color: 'var(--text-primary)' }}>{formatCurrency(taxAmount)}</span></span>}
+                      <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Total {formatCurrency(subtotal + taxAmount)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -262,12 +366,27 @@ export function QuotesPage() {
                   <Td right mono style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(q.total)}</Td>
                   <Td><Badge variant={QUOTE_STATUS_BADGE[q.status].variant}>{q.status}</Badge></Td>
                   <Td>
-                    <div className="flex items-center gap-2">
-                      {isAccountant && q.status === 'draft' && (
-                        <button className="text-xs font-medium px-2 py-1 rounded-md transition-colors hover:bg-indigo-50" style={{ color: '#4f46e5' }} onClick={() => updateStatus(q.id, 'sent')}>Send</button>
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        to={`/quotes/${q.id}/print`}
+                        target="_blank"
+                        className="p-1.5 rounded-md hover:bg-indigo-50 transition-colors"
+                        title="Download / Print PDF"
+                        style={{ color: '#6366f1' }}
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </Link>
+                      {isAccountant && (q.status === 'draft' || q.status === 'sent') && (
+                        <button
+                          className="text-xs font-medium px-2 py-1 rounded-md transition-colors hover:bg-indigo-50"
+                          style={{ color: '#4f46e5' }}
+                          onClick={() => setSendingQuote(q)}
+                        >
+                          {q.status === 'sent' ? 'Resend' : 'Send'}
+                        </button>
                       )}
                       {isAccountant && q.status === 'sent' && (
-                        <button className="text-xs font-medium px-2 py-1 rounded-md transition-colors hover:bg-emerald-50" style={{ color: '#16a34a' }} onClick={() => updateStatus(q.id, 'accepted')}>Accept</button>
+                        <button className="text-xs font-medium px-2 py-1 rounded-md transition-colors hover:bg-emerald-50" style={{ color: '#16a34a' }} onClick={() => updateStatus(q.id, 'accepted')}>Mark accepted</button>
                       )}
                       {isAccountant && q.status === 'accepted' && !q.invoice_id && (
                         <button
@@ -289,5 +408,19 @@ export function QuotesPage() {
         </Card>
       </div>
     </div>
+
+    {sendingQuote && settings && (
+      <SendQuoteModal
+        quoteId={sendingQuote.id}
+        quoteNumber={sendingQuote.number}
+        customerName={sendingQuote.contacts?.name ?? ''}
+        customerEmail={sendingQuote.customer_email ?? sendingQuote.contacts?.email ?? null}
+        companyName={settings.company_name}
+        customerToken={sendingQuote.customer_token}
+        onSent={() => { setSendingQuote(null); load() }}
+        onClose={() => setSendingQuote(null)}
+      />
+    )}
+    </>
   )
 }

@@ -15,6 +15,18 @@ import { ExpensesPage } from '@/pages/ExpensesPage'
 import { ContactsPage } from '@/pages/ContactsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { UsersPage } from '@/pages/UsersPage'
+import { SettingsPage } from '@/pages/SettingsPage'
+import { InvoicePrintPage } from '@/pages/InvoicePrintPage'
+import { QuotePrintPage } from '@/pages/QuotePrintPage'
+import { QuoteCustomerPage } from '@/pages/QuoteCustomerPage'
+import { CreditNotesPage } from '@/pages/CreditNotesPage'
+import { EmployeesPage } from '@/pages/EmployeesPage'
+import { PayrollPage } from '@/pages/PayrollPage'
+import { PayslipPrintPage } from '@/pages/PayslipPrintPage'
+import { StatutoryReturnsPage } from '@/pages/StatutoryReturnsPage'
+import { ReceiptsPage } from '@/pages/ReceiptsPage'
+import { ReceiptPrintPage } from '@/pages/ReceiptPrintPage'
+import { InventoryPage } from '@/pages/InventoryPage'
 
 export default function App() {
   return (
@@ -23,6 +35,17 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+
+          {/* Print views — no sidebar */}
+          <Route path="/invoices/:id/print" element={<ProtectedRoute><InvoicePrintPage /></ProtectedRoute>} />
+          <Route path="/invoices/:id/receipt" element={<ProtectedRoute><ReceiptPrintPage /></ProtectedRoute>} />
+          <Route path="/quotes/:id/print" element={<ProtectedRoute><QuotePrintPage /></ProtectedRoute>} />
+          <Route path="/payroll/:runId/print" element={<ProtectedRoute><PayslipPrintPage /></ProtectedRoute>} />
+          <Route path="/payroll/:runId/returns" element={<ProtectedRoute><StatutoryReturnsPage /></ProtectedRoute>} />
+
+          {/* Public customer portal — no auth */}
+          <Route path="/q/:token" element={<QuoteCustomerPage />} />
+
           <Route
             path="/"
             element={
@@ -37,12 +60,17 @@ export default function App() {
             <Route path="quotes" element={<QuotesPage />} />
             <Route path="invoices" element={<InvoicesPage />} />
             <Route path="payments" element={<PaymentsPage />} />
+            <Route path="receipts" element={<ReceiptsPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
             <Route path="bills" element={<BillsPage />} />
             <Route path="expenses" element={<ExpensesPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="credit-notes" element={<CreditNotesPage />} />
+            <Route path="employees" element={<EmployeesPage />} />
+            <Route path="payroll" element={<PayrollPage />} />
             <Route path="users" element={<UsersPage />} />
-            <Route path="settings" element={<div className="p-8 text-gray-400">Settings coming soon</div>} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

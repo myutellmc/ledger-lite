@@ -12,6 +12,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Plus, Search, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 
 type PaymentType = 'received' | 'made'
+type PaymentMethod = 'cash' | 'mobile_money' | 'bank_transfer' | 'cheque'
+
+const METHOD_LABELS: Record<string, string> = { cash: 'Cash', mobile_money: 'Mobile Money', bank_transfer: 'Bank Transfer', cheque: 'Cheque' }
+const METHOD_COLORS: Record<string, string> = { cash: '#16a34a', mobile_money: '#7c3aed', bank_transfer: '#2563eb', cheque: '#0891b2' }
 
 interface Payment {
   id: string
@@ -20,6 +24,8 @@ interface Payment {
   amount: number
   reference: string | null
   notes: string | null
+  payment_method: PaymentMethod | null
+  transaction_id: string | null
   invoice_id: string | null
   bill_id: string | null
   accounts: { name: string } | null
@@ -30,8 +36,8 @@ interface Payment {
 export function PaymentsPage() {
   const { isAccountant, user } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
-  const [invoices, setInvoices] = useState<{ id: string; number: string; contacts: { name: string } | null; total: number }[]>([])
-  const [bills, setBills] = useState<{ id: string; number: string; contacts: { name: string } | null; total: number }[]>([])
+  const [invoices, setInvoices] = useState<{ id: string; number: string; contacts: { name: string } | null; total: number; amount_paid: number }[]>([])
+  const [bills, setBills] = useState<{ id: string; number: string; contacts: { name: string } | null; total: number; amount_paid: number }[]>([])
   const [bankAccounts, setBankAccounts] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -39,12 +45,14 @@ export function PaymentsPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [paymentType, setPaymentType] = useState<PaymentType>('received')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     amount: '',
     account_id: '',
     invoice_id: '',
     bill_id: '',
+    transaction_id: '',
     reference: '',
     notes: '',
   })
@@ -60,8 +68,8 @@ export function PaymentsPage() {
 
   useEffect(() => {
     load()
-    supabase.from('invoices').select('id, number, total, contacts(name)').in('status', ['sent', 'overdue']).then(({ data }) => setInvoices(data ?? []))
-    supabase.from('bills').select('id, number, total, contacts(name)').in('status', ['received', 'overdue']).then(({ data }) => setBills(data ?? []))
+    supabase.from('invoices').select('id, number, total, amount_paid, contacts(name)').in('status', ['sent', 'overdue']).then(({ data }) => setInvoices((data ?? []) as any))
+    supabase.from('bills').select('id, number, total, amount_paid, contacts(name)').in('status', ['received', 'overdue']).then(({ data }) => setBills((data ?? []) as any))
     supabase.from('accounts').select('id, name').in('type', ['asset']).then(({ data }) => setBankAccounts(data ?? []))
   }, [])
 
@@ -75,22 +83,16 @@ export function PaymentsPage() {
       account_id: form.account_id,
       invoice_id: paymentType === 'received' ? form.invoice_id || null : null,
       bill_id: paymentType === 'made' ? form.bill_id || null : null,
-      reference: form.reference || null,
+      payment_method: paymentMethod,
+      transaction_id: form.transaction_id || null,
+      reference: form.transaction_id || form.reference || null,
       notes: form.notes || null,
       created_by: user.id,
     })
 
-    // Update invoice/bill status to paid if fully paid
-    if (paymentType === 'received' && form.invoice_id) {
-      await supabase.from('invoices').update({ status: 'paid' }).eq('id', form.invoice_id)
-    }
-    if (paymentType === 'made' && form.bill_id) {
-      await supabase.from('bills').update({ status: 'paid' }).eq('id', form.bill_id)
-    }
-
     setSaving(false)
     setShowForm(false)
-    setForm({ date: new Date().toISOString().split('T')[0], amount: '', account_id: '', invoice_id: '', bill_id: '', reference: '', notes: '' })
+    setForm({ date: new Date().toISOString().split('T')[0], amount: '', account_id: '', invoice_id: '', bill_id: '', transaction_id: '', reference: '', notes: '' })
     load()
   }
 
@@ -175,6 +177,18 @@ export function PaymentsPage() {
                 ))}
               </div>
             </div>
+            <div className="px-6 pt-3 pb-1">
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Payment method</p>
+              <div className="flex gap-2">
+                {(['cash', 'mobile_money', 'bank_transfer', 'cheque'] as PaymentMethod[]).map(m => (
+                  <button key={m} type="button" onClick={() => setPaymentMethod(m)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={{ border: paymentMethod === m ? `2px solid ${METHOD_COLORS[m]}` : '2px solid var(--border-default)', background: paymentMethod === m ? `${METHOD_COLORS[m]}15` : 'transparent', color: paymentMethod === m ? METHOD_COLORS[m] : 'var(--text-muted)' }}>
+                    {METHOD_LABELS[m]}
+                  </button>
+                ))}
+              </div>
+            </div>
             <form onSubmit={handleSave} className="px-6 py-4 grid grid-cols-3 gap-4">
               <Input label="Date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
               <Input label="Amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" required />
@@ -192,9 +206,9 @@ export function PaymentsPage() {
                   value={form.invoice_id}
                   onChange={e => {
                     const inv = invoices.find(i => i.id === e.target.value)
-                    setForm(f => ({ ...f, invoice_id: e.target.value, amount: inv ? String(inv.total) : f.amount }))
+                    setForm(f => ({ ...f, invoice_id: e.target.value, amount: inv ? String(inv.total - inv.amount_paid) : f.amount }))
                   }}
-                  options={invoices.map(i => ({ value: i.id, label: `${i.number} — ${i.contacts?.name ?? ''} (${formatCurrency(i.total)})` }))}
+                  options={invoices.map(i => ({ value: i.id, label: `${i.number} — ${i.contacts?.name ?? ''} (due ${formatCurrency(i.total - i.amount_paid)})` }))}
                   placeholder="Select invoice (optional)"
                 />
               ) : (
@@ -203,13 +217,15 @@ export function PaymentsPage() {
                   value={form.bill_id}
                   onChange={e => {
                     const bill = bills.find(b => b.id === e.target.value)
-                    setForm(f => ({ ...f, bill_id: e.target.value, amount: bill ? String(bill.total) : f.amount }))
+                    setForm(f => ({ ...f, bill_id: e.target.value, amount: bill ? String(bill.total - bill.amount_paid) : f.amount }))
                   }}
-                  options={bills.map(b => ({ value: b.id, label: `${b.number} — ${b.contacts?.name ?? ''} (${formatCurrency(b.total)})` }))}
+                  options={bills.map(b => ({ value: b.id, label: `${b.number} — ${b.contacts?.name ?? ''} (due ${formatCurrency(b.total - b.amount_paid)})` }))}
                   placeholder="Select bill (optional)"
                 />
               )}
-              <Input label="Reference" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="Cheque no., transfer ref..." />
+              {paymentMethod !== 'cash' && (
+                <Input label={paymentMethod === 'mobile_money' ? 'Transaction ID' : paymentMethod === 'cheque' ? 'Cheque Number' : 'Bank Reference'} value={form.transaction_id} onChange={e => setForm(f => ({ ...f, transaction_id: e.target.value }))} placeholder={paymentMethod === 'mobile_money' ? 'e.g. CG25AB1234' : paymentMethod === 'cheque' ? 'e.g. 000123' : 'e.g. FT25001234'} />
+              )}
               <Input label="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
               <div className="flex items-end gap-2 col-span-3">
                 <Button type="submit" loading={saving}>Save Payment</Button>
@@ -256,13 +272,14 @@ export function PaymentsPage() {
               <Th>Date</Th>
               <Th>Type</Th>
               <Th>Contact</Th>
-              <Th>Reference</Th>
+              <Th>Method</Th>
+              <Th>Transaction ID</Th>
               <Th>Account</Th>
               <Th right>Amount</Th>
             </TableHead>
             <TableBody>
               {loading ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading payments...</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading payments...</td></tr>
               ) : filtered.length === 0 ? (
                 <EmptyState title="No payments yet" description="Record your first payment using the button above" />
               ) : filtered.map(p => (
@@ -284,7 +301,14 @@ export function PaymentsPage() {
                       </span>
                     )}
                   </Td>
-                  <Td mono>{p.reference ?? '—'}</Td>
+                  <Td>
+                    {p.payment_method ? (
+                      <span className="text-xs font-semibold" style={{ color: METHOD_COLORS[p.payment_method] ?? 'var(--text-muted)' }}>
+                        {METHOD_LABELS[p.payment_method] ?? p.payment_method}
+                      </span>
+                    ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                  </Td>
+                  <Td mono style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{p.transaction_id ?? p.reference ?? '—'}</Td>
                   <Td>{p.accounts?.name}</Td>
                   <Td right mono style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(p.amount)}</Td>
                 </DataRow>

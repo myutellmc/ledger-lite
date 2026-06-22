@@ -5,7 +5,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = 'USD'): string {
+export function formatCurrency(amount: number, currency = 'ZMW'): string {
+  if (currency === 'ZMW') {
+    const formatted = new Intl.NumberFormat('en-ZM', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount)
+    return `K ${formatted}`
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -14,7 +21,7 @@ export function formatCurrency(amount: number, currency = 'USD'): string {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('en-GB', {
     year: 'numeric',
     month: 'short',
     day: '2-digit',

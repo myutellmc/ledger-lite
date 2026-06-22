@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { supabase } from '@/lib/supabase'
 
 export function LoginPage() {
   const { signIn } = useAuth()
@@ -11,6 +10,9 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [showReset, setShowReset] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,6 +22,16 @@ export function LoginPage() {
     setLoading(false)
     if (error) setError(error.message)
     else navigate('/')
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email) { setError('Enter your email address first'); return }
+    setResetLoading(true)
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` })
+    setResetLoading(false)
+    setResetSent(true)
+    setShowReset(false)
   }
 
   return (
@@ -33,18 +45,22 @@ export function LoginPage() {
         style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
       >
         <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-              <rect x="1" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
-              <rect x="7" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.6" />
-              <rect x="1" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.6" />
-              <rect x="7" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#1e1b4b' }}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <rect x="9.25" y="11" width="1.5" height="6" rx="0.75" fill="#fbbf24"/>
+              <rect x="6" y="16" width="8" height="1.5" rx="0.75" fill="rgba(251,191,36,0.4)"/>
+              <rect x="3.5" y="8.5" width="13" height="1.5" rx="0.75" fill="#fbbf24"/>
+              <line x1="4.5" y1="10" x2="3.5" y2="13.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="1" y="13" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              <line x1="15.5" y1="10" x2="16.5" y2="12.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="14" y="12" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              <circle cx="10" cy="8.5" r="1.5" fill="#fde68a"/>
             </svg>
           </div>
-          <span className="font-semibold text-white" style={{ letterSpacing: '-0.01em' }}>Ledger Lite</span>
+          <div>
+            <p className="text-sm font-semibold leading-tight" style={{ color: '#f1f5f9', letterSpacing: '-0.01em' }}>Ledger Lite</p>
+            <p className="text-xs leading-tight mt-0.5" style={{ color: 'rgba(148,163,184,0.7)' }}>Accounting</p>
+          </div>
         </div>
 
         <div>
@@ -71,13 +87,22 @@ export function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-10 lg:hidden">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}>
-              <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-                <rect x="1" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
-                <rect x="7" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#1e1b4b' }}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="9.25" y="11" width="1.5" height="6" rx="0.75" fill="#fbbf24"/>
+                <rect x="6" y="16" width="8" height="1.5" rx="0.75" fill="rgba(251,191,36,0.4)"/>
+                <rect x="3.5" y="8.5" width="13" height="1.5" rx="0.75" fill="#fbbf24"/>
+                <line x1="4.5" y1="10" x2="3.5" y2="13.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+                <rect x="1" y="13" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+                <line x1="15.5" y1="10" x2="16.5" y2="12.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+                <rect x="14" y="12" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+                <circle cx="10" cy="8.5" r="1.5" fill="#fde68a"/>
               </svg>
             </div>
-            <span className="font-semibold text-white">Ledger Lite</span>
+            <div>
+              <p className="text-sm font-semibold leading-tight" style={{ color: '#f1f5f9', letterSpacing: '-0.01em' }}>Ledger Lite</p>
+              <p className="text-xs leading-tight mt-0.5" style={{ color: 'rgba(148,163,184,0.7)' }}>Accounting</p>
+            </div>
           </div>
 
           <h1 className="text-2xl font-semibold mb-1" style={{ color: '#f1f5f9', letterSpacing: '-0.03em' }}>
@@ -132,14 +157,47 @@ export function LoginPage() {
                 {error}
               </div>
             )}
+            {resetSent && (
+              <div className="rounded-lg px-3.5 py-2.5 text-sm" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)', color: '#86efac' }}>
+                Password reset link sent — check your email.
+              </div>
+            )}
+
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowReset(s => !s); setError('') }}
+                className="text-xs transition-colors"
+                style={{ color: 'rgba(148,163,184,0.7)', background: 'none', border: 'none', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#a5b4fc')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(148,163,184,0.7)')}
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {showReset && (
+              <div className="rounded-lg px-3.5 py-3 text-sm slide-down" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                <p className="text-xs mb-2" style={{ color: '#a5b4fc' }}>A reset link will be sent to your email address above.</p>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
+                  style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc', border: 'none', cursor: 'pointer' }}
+                >
+                  {resetLoading ? 'Sending...' : 'Send reset link'}
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-10 rounded-lg text-sm font-semibold transition-all duration-100 active:scale-[0.99] disabled:opacity-50 mt-2"
-              style={{ background: '#6366f1', color: 'white' }}
+              className="w-full h-10 rounded-lg text-sm font-semibold transition-all duration-100 active:scale-[0.99] disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', boxShadow: '0 2px 8px rgba(99,102,241,0.35)' }}
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
 

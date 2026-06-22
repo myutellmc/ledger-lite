@@ -22,10 +22,11 @@
   --sidebar-active-border: #6366f1;
   --sidebar-hover-bg: rgba(255, 255, 255, 0.04);
 
-  --page-bg: #f8fafc;
+  --page-bg: #f4f6f9;
   --card-bg: #ffffff;
   --card-border: #e2e8f0;
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
 
   --text-primary: #0f172a;
   --text-secondary: #475569;
@@ -39,11 +40,12 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+
+  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px #6366f1;
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ── Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
 
 html {
   -webkit-font-smoothing: antialiased;
@@ -60,21 +62,107 @@ body {
   line-height: 1.5;
 }
 
-#root {
-  min-height: 100svh;
+#root { min-height: 100svh; }
+
+/* ── Scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #dde1e7; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #b0b8c4; }
+
+/* ── Focus styles ───────────────────────────────────── */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-/* Typography helpers */
+/* ── Typography helpers ─────────────────────────────── */
 .font-tabular { font-variant-numeric: tabular-nums; }
 
-/* Table row hover */
+/* ── Table rows ─────────────────────────────────────── */
+.data-row { transition: background-color 0.1s ease; }
 .data-row:hover { background-color: #f8fafc; }
 
-/* Transitions */
+/* ── Transitions ────────────────────────────────────── */
 .transition-fast { transition: all 0.12s ease; }
+
+/* ── Skeleton loading animation ─────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e8edf2 50%, #f1f5f9 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+
+/* ── Fade-in animation ──────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.18s ease both; }
+
+/* ── Slide-down animation ───────────────────────────── */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.slide-down { animation: slideDown 0.15s ease both; }
+
+/* ── Toast animations ───────────────────────────────── */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(100%) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0) scale(1); max-height: 100px; margin-bottom: 8px; }
+  to   { opacity: 0; transform: translateX(100%) scale(0.95); max-height: 0; margin-bottom: 0; }
+}
+.toast-in  { animation: toastIn  0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.toast-out { animation: toastOut 0.2s ease-in both; }
+
+/* ── Modal backdrop ─────────────────────────────────── */
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-backdrop { animation: backdropIn 0.15s ease both; }
+.modal-content  { animation: modalIn   0.2s cubic-bezier(0.34, 1.2, 0.64, 1) both; }
+
+/* ── Card hover ─────────────────────────────────────── */
+.card-hover {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.card-hover:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-1px);
+}
+
+/* ── Number inputs — hide spinners ──────────────────── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+input[type="number"] { -moz-appearance: textfield; }
+
+/* ── Print utilities ────────────────────────────────── */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+}
+
+/* ── Stat card accent bar ───────────────────────────── */
+.stat-accent::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: currentColor;
+}

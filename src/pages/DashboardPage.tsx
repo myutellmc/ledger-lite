@@ -13,7 +13,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, AlertTriangle, Clock, ArrowRight, ClipboardList, Receipt, FileCheck, Banknote } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { getUpcomingDeadlines, formatDaysUntil } from '@/lib/taxCalendar'
 
 interface Stats {
   totalRevenue: number
@@ -42,6 +44,7 @@ const statCards = (stats: Stats) => [
     iconColor: '#16a34a',
     trend: 'This year',
     trendColor: '#16a34a',
+    link: null,
   },
   {
     label: 'Total Expenses',
@@ -51,6 +54,7 @@ const statCards = (stats: Stats) => [
     iconColor: '#dc2626',
     trend: stats.totalRevenue > 0 ? `${Math.round((stats.totalExpenses / stats.totalRevenue) * 100)}% of revenue` : '—',
     trendColor: '#94a3b8',
+    link: '/expenses',
   },
   {
     label: 'Outstanding',
@@ -60,6 +64,7 @@ const statCards = (stats: Stats) => [
     iconColor: '#2563eb',
     trend: 'Awaiting payment',
     trendColor: '#94a3b8',
+    link: '/invoices',
   },
   {
     label: 'Overdue',
@@ -69,6 +74,7 @@ const statCards = (stats: Stats) => [
     iconColor: '#d97706',
     trend: stats.overdueCount > 0 ? 'Requires attention' : 'All clear',
     trendColor: stats.overdueCount > 0 ? '#d97706' : '#16a34a',
+    link: '/invoices',
   },
 ]
 
@@ -95,10 +101,21 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
+interface Pipeline {
+  draftQuotes: number
+  sentQuotes: number
+  sentQuotesValue: number
+  openInvoices: number
+  openInvoicesValue: number
+  paidThisMonth: number
+  paidThisMonthValue: number
+}
+
 export function DashboardPage() {
   const [stats, setStats] = useState<Stats>({ totalRevenue: 0, totalExpenses: 0, outstanding: 0, overdueCount: 0 })
   const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([])
   const [chartData, setChartData] = useState<{ month: string; revenue: number; expenses: number }[]>([])
+  const [pipeline, setPipeline] = useState<Pipeline>({ draftQuotes: 0, sentQuotes: 0, sentQuotesValue: 0, openInvoices: 0, openInvoicesValue: 0, paidThisMonth: 0, paidThisMonthValue: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -106,9 +123,12 @@ export function DashboardPage() {
       const year = new Date().getFullYear()
       const startOfYear = `${year}-01-01`
 
-      const [invoicesRes, expensesRes] = await Promise.all([
-        supabase.from('invoices').select('total, status, due_date, number, created_at, contacts(name)').gte('created_at', startOfYear),
+      const thisMonthStart = `${year}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`
+
+      const [invoicesRes, expensesRes, quotesRes] = await Promise.all([
+        supabase.from('invoices').select('total, status, due_date, number, created_at, contacts(name), paid_at').gte('created_at', startOfYear),
         supabase.from('expenses').select('amount, date').gte('date', startOfYear),
+        supabase.from('quotes').select('status, total'),
       ])
 
       const invoices = invoicesRes.data ?? []
@@ -121,6 +141,19 @@ export function DashboardPage() {
       const overdueCount = invoices.filter((i: { status: string }) => i.status === 'overdue').length
 
       setStats({ totalRevenue, totalExpenses, outstanding, overdueCount })
+
+      // Pipeline
+      const quotes = quotesRes.data ?? []
+      const paidThisMonth = invoices.filter((i: { status: string; paid_at?: string }) => i.status === 'paid' && i.paid_at && i.paid_at >= thisMonthStart)
+      setPipeline({
+        draftQuotes: quotes.filter((q: { status: string }) => q.status === 'draft').length,
+        sentQuotes: quotes.filter((q: { status: string }) => q.status === 'sent').length,
+        sentQuotesValue: quotes.filter((q: { status: string }) => q.status === 'sent').reduce((s: number, q: { total: number }) => s + q.total, 0),
+        openInvoices: invoices.filter((i: { status: string }) => i.status === 'sent' || i.status === 'overdue').length,
+        openInvoicesValue: outstanding + invoices.filter((i: { status: string }) => i.status === 'overdue').reduce((s: number, i: { total: number }) => s + i.total, 0),
+        paidThisMonth: paidThisMonth.length,
+        paidThisMonthValue: paidThisMonth.reduce((s: number, i: { total: number }) => s + i.total, 0),
+      })
 
       const monthly: Record<number, { revenue: number; expenses: number }> = {}
       for (let m = 0; m < 12; m++) monthly[m] = { revenue: 0, expenses: 0 }
@@ -161,31 +194,112 @@ export function DashboardPage() {
       <div className="p-8 space-y-6">
         {/* Stat cards */}
         <div className="grid grid-cols-4 gap-4">
-          {cards.map(({ label, value, icon: Icon, iconBg, iconColor, trend, trendColor }) => (
-            <Card key={label}>
+          {cards.map(({ label, value, icon: Icon, iconBg, iconColor, trend, trendColor, link }) => {
+            const inner = (
               <CardContent className="py-5">
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
                     {label}
                   </p>
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: iconBg }}
-                  >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: iconBg }}>
                     <Icon className="w-4 h-4" style={{ color: iconColor }} />
                   </div>
                 </div>
-                <p
-                  className="text-2xl font-bold leading-none mb-2"
-                  style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}
-                >
+                <p className="text-2xl font-bold leading-none mb-2" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
                   {loading ? '—' : value}
                 </p>
-                <p className="text-xs font-medium" style={{ color: trendColor }}>{trend}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium" style={{ color: trendColor }}>{trend}</p>
+                  {link && <span className="text-xs" style={{ color: '#6366f1' }}><ArrowRight className="w-3 h-3" /></span>}
+                </div>
               </CardContent>
-            </Card>
-          ))}
+            )
+            return link ? (
+              <Link key={label} to={link} className="block card-hover" style={{ borderRadius: 'var(--radius-card)', textDecoration: 'none' }}>
+                <Card>{inner}</Card>
+              </Link>
+            ) : (
+              <Card key={label}>{inner}</Card>
+            )
+          })}
         </div>
+
+        {/* Business Pipeline */}
+        <Card>
+          <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <div className="flex items-center gap-2.5">
+              <ArrowRight className="w-4 h-4" style={{ color: '#6366f1' }} />
+              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Business Pipeline</h3>
+              <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>— quote to receipt flow</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 divide-x" style={{ borderColor: 'var(--border-light)' }}>
+            {[
+              { label: 'Quotes Pending', count: pipeline.draftQuotes + pipeline.sentQuotes, value: pipeline.sentQuotesValue, sub: `${pipeline.draftQuotes} draft · ${pipeline.sentQuotes} sent`, icon: ClipboardList, color: '#6366f1', link: '/quotes' },
+              { label: 'Open Invoices', count: pipeline.openInvoices, value: pipeline.openInvoicesValue, sub: 'Awaiting payment', icon: Receipt, color: '#f59e0b', link: '/invoices' },
+              { label: 'Paid This Month', count: pipeline.paidThisMonth, value: pipeline.paidThisMonthValue, sub: 'Receipts issued', icon: FileCheck, color: '#16a34a', link: '/receipts' },
+              { label: 'Total Collected', count: null, value: stats.totalRevenue, sub: `${new Date().getFullYear()} to date`, icon: Banknote, color: '#2563eb', link: '/payments' },
+            ].map((stage, i) => {
+              const Icon = stage.icon
+              const inner = (
+                <div className="px-5 py-4 group cursor-pointer hover:bg-slate-50 transition-colors" style={{ borderRight: i < 3 ? '1px solid var(--border-light)' : 'none' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${stage.color}15` }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: stage.color }} />
+                    </div>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{stage.label}</p>
+                  </div>
+                  <p className="text-xl font-bold mb-0.5" style={{ color: stage.color, fontVariantNumeric: 'tabular-nums' }}>
+                    {loading ? '—' : formatCurrency(stage.value)}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {loading ? '' : (stage.count !== null ? `${stage.count} ${stage.count === 1 ? 'item' : 'items'} · ` : '')}{stage.sub}
+                  </p>
+                </div>
+              )
+              return (
+                <Link key={stage.label} to={stage.link} style={{ textDecoration: 'none', display: 'block' }}>
+                  {inner}
+                </Link>
+              )
+            })}
+          </div>
+        </Card>
+
+        {/* Tax Compliance Calendar */}
+        {(() => {
+          const deadlines = getUpcomingDeadlines(new Date())
+          return (
+            <Card>
+              <div className="px-6 py-4 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Clock className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Tax Compliance Calendar</h3>
+                <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>— ZRA / NAPSA / NHIMA obligations</span>
+              </div>
+              <div className="grid grid-cols-4 divide-x" style={{ borderColor: 'var(--border-light)' }}>
+                {deadlines.map(d => (
+                  <div key={d.label} className="px-5 py-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded"
+                        style={{ background: d.color + '18', color: d.color }}
+                      >
+                        {formatDaysUntil(d.daysUntil)}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{d.label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{d.description}</p>
+                    <p className="text-xs mt-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>
+                      {d.dueDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{d.authority}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )
+        })()}
 
         {/* Chart + recent invoices */}
         <div className="grid grid-cols-3 gap-6">
@@ -237,7 +351,7 @@ export function DashboardPage() {
                       tick={{ fontSize: 11, fill: '#94a3b8', fontFamily: 'Inter' }}
                       axisLine={false}
                       tickLine={false}
-                      tickFormatter={v => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                      tickFormatter={v => `K ${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
                     />
                     <Tooltip content={<CustomTooltip />} />
                     <Area
@@ -269,9 +383,17 @@ export function DashboardPage() {
           {/* Recent invoices */}
           <Card>
             <CardHeader>
-              <h3 className="font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                Recent Invoices
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                  Recent Invoices
+                </h3>
+                <Link to="/invoices" className="flex items-center gap-1 text-xs font-medium transition-colors" style={{ color: '#6366f1' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#4f46e5'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#6366f1'}
+                >
+                  View all <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
             </CardHeader>
             {loading ? (
               <div className="px-6 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>

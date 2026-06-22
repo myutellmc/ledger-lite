@@ -8,7 +8,9 @@ import { Select } from '@/components/ui/Select'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, TableHead, TableBody, DataRow, Th, Td, EmptyState } from '@/components/ui/TableRow'
 import { useAuth } from '@/contexts/AuthContext'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
+import { CsvUpload } from '@/components/ui/CsvUpload'
+import { useToast } from '@/components/ui/Toast'
 
 interface Contact {
   id: string
@@ -37,15 +39,20 @@ const TYPE_BADGE: Record<Contact['type'], { variant: 'info' | 'warning' | 'defau
   both: { variant: 'default' },
 }
 
+const EMPTY_FORM = { name: '', email: '', phone: '', type: 'customer' as Contact['type'], tax_number: '', address: '' }
+
 export function ContactsPage() {
   const { isAccountant } = useAuth()
+  const toast = useToast()
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editContact, setEditContact] = useState<Contact | null>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', phone: '', type: 'customer' as Contact['type'], tax_number: '', address: '' })
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
 
   async function load() {
     const { data } = await supabase.from('contacts').select('*').order('name')
@@ -55,17 +62,41 @@ export function ContactsPage() {
 
   useEffect(() => { load() }, [])
 
+  function openNew() {
+    setEditContact(null); setForm(EMPTY_FORM); setShowForm(true)
+  }
+  function openEdit(c: Contact) {
+    setEditContact(c)
+    setForm({ name: c.name, email: c.email ?? '', phone: c.phone ?? '', type: c.type, tax_number: c.tax_number ?? '', address: '' })
+    setShowForm(true)
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await supabase.from('contacts').insert({
-      name: form.name, email: form.email || null, phone: form.phone || null, type: form.type,
-      tax_number: form.tax_number || null, address: form.address || null, is_active: true,
-    })
-    setSaving(false)
-    setShowForm(false)
-    setForm({ name: '', email: '', phone: '', type: 'customer', tax_number: '', address: '' })
-    load()
+    const payload = {
+      name: form.name.trim(), email: form.email || null, phone: form.phone || null, type: form.type,
+      tax_number: form.tax_number || null, address: form.address || null,
+    }
+    if (editContact) {
+      const { error } = await supabase.from('contacts').update(payload).eq('id', editContact.id)
+      if (error) toast.error('Save failed', error.message)
+      else toast.success('Contact updated')
+    } else {
+      const { error } = await supabase.from('contacts').insert({ ...payload, is_active: true })
+      if (error) toast.error('Save failed', error.message)
+      else toast.success('Contact added')
+    }
+    setSaving(false); setShowForm(false); setEditContact(null); setForm(EMPTY_FORM); load()
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+    setDeletingId(id)
+    const { error } = await supabase.from('contacts').delete().eq('id', id)
+    if (error) toast.error('Delete failed', error.message)
+    else toast.success('Contact deleted')
+    setDeletingId(null); load()
   }
 
   const filtered = contacts
@@ -78,28 +109,67 @@ export function ContactsPage() {
         title="Contacts"
         description="Manage customers and vendors"
         actions={isAccountant && (
-          <Button onClick={() => setShowForm(!showForm)} size="sm">
+          <Button onClick={openNew} size="sm">
             <Plus className="w-3.5 h-3.5" /> New Contact
           </Button>
         )}
       />
 
       <div className="p-8 space-y-5">
+        {isAccountant && (
+          <CsvUpload
+            templateFilename="contacts_template.csv"
+            columns={[
+              { key: 'name',       label: 'Name',           required: true, hint: 'Acme Ltd' },
+              { key: 'type',       label: 'Type',           required: true, hint: 'customer' },
+              { key: 'email',      label: 'Email',                          hint: 'info@acme.com' },
+              { key: 'phone',      label: 'Phone',                          hint: '+260 21 1234567' },
+              { key: 'tax_number', label: 'Tax / TPIN',                     hint: '1000012345' },
+              { key: 'address',    label: 'Address',                        hint: 'Cairo Road, Lusaka' },
+            ]}
+            sampleRows={[
+              { name: 'Acme Ltd', type: 'customer', email: 'info@acme.com', phone: '+260 21 1000001', tax_number: '1000012345', address: 'Cairo Road, Lusaka' },
+              { name: 'ZAF Supplies', type: 'vendor', email: 'orders@zaf.zm', phone: '+260 97 5000002', tax_number: '', address: 'Industrial Area, Lusaka' },
+            ]}
+            onImport={async rows => {
+              const errors: string[] = []
+              let imported = 0
+              for (const r of rows) {
+                const type = ['customer','vendor','both'].includes(r.type?.toLowerCase()) ? r.type.toLowerCase() as Contact['type'] : 'customer'
+                const { error } = await supabase.from('contacts').insert({
+                  name: r.name.trim(), type,
+                  email: r.email?.trim() || null,
+                  phone: r.phone?.trim() || null,
+                  tax_number: r.tax_number?.trim() || null,
+                  address: r.address?.trim() || null,
+                  is_active: true,
+                })
+                if (error) errors.push(`${r.name}: ${error.message}`)
+                else imported++
+              }
+              load()
+              return { imported, errors }
+            }}
+          />
+        )}
+
         {showForm && (
-          <Card>
-            <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Add Contact</h3>
+          <Card className="fade-in">
+            <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                {editContact ? 'Edit Contact' : 'New Contact'}
+              </h3>
             </div>
             <form onSubmit={handleSave} className="px-6 py-5 grid grid-cols-3 gap-4">
               <Input label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Company or person name" required />
               <Input label="Email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="contact@example.com" />
-              <Input label="Phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+1 555 000 0000" />
+              <Input label="Phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+260 97 0000000" />
               <Select label="Type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as Contact['type'] }))} options={TYPE_OPTIONS} />
-              <Input label="Tax / VAT Number" value={form.tax_number} onChange={e => setForm(f => ({ ...f, tax_number: e.target.value }))} placeholder="Optional" />
+              <Input label="Tax / TPIN" value={form.tax_number} onChange={e => setForm(f => ({ ...f, tax_number: e.target.value }))} placeholder="Optional" />
               <Input label="Address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Optional" />
-              <div className="flex items-end gap-3 col-span-3">
-                <Button type="submit" loading={saving}>Save Contact</Button>
-                <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
+              <div className="flex items-end gap-2 col-span-3">
+                <Button type="submit" loading={saving}>{editContact ? 'Save Changes' : 'Add Contact'}</Button>
+                <Button type="button" variant="secondary" onClick={() => { setShowForm(false); setEditContact(null) }}>Cancel</Button>
               </div>
             </form>
           </Card>
@@ -129,12 +199,13 @@ export function ContactsPage() {
               <Th>Email</Th>
               <Th>Phone</Th>
               <Th>Type</Th>
-              <Th>Tax No.</Th>
+              <Th>TPIN</Th>
               <Th>Status</Th>
+              {isAccountant && <Th></Th>}
             </TableHead>
             <TableBody>
               {loading ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading contacts...</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading contacts…</td></tr>
               ) : filtered.length === 0 ? (
                 <EmptyState title="No contacts found" description="Add your first contact using the button above" />
               ) : filtered.map(c => (
@@ -145,6 +216,29 @@ export function ContactsPage() {
                   <Td><Badge variant={TYPE_BADGE[c.type].variant}>{c.type}</Badge></Td>
                   <Td mono>{c.tax_number ?? '—'}</Td>
                   <Td><Badge variant={c.is_active ? 'success' : 'neutral'}>{c.is_active ? 'Active' : 'Inactive'}</Badge></Td>
+                  {isAccountant && (
+                    <Td>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEdit(c)}
+                          className="p-1.5 rounded-md transition-colors hover:bg-indigo-50"
+                          title="Edit"
+                          style={{ color: '#6366f1' }}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(c.id, c.name)}
+                          disabled={deletingId === c.id}
+                          className="p-1.5 rounded-md transition-colors hover:bg-red-50 disabled:opacity-40"
+                          title="Delete"
+                          style={{ color: '#ef4444' }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </Td>
+                  )}
                 </DataRow>
               ))}
             </TableBody>

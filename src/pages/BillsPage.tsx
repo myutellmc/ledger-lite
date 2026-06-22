@@ -9,8 +9,10 @@ import { Select } from '@/components/ui/Select'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, TableHead, TableBody, DataRow, Th, Td, EmptyState } from '@/components/ui/TableRow'
 import { useAuth } from '@/contexts/AuthContext'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Trash2, Sparkles } from 'lucide-react'
 import type { BillStatus } from '@/lib/database.types'
+import { useToast } from '@/components/ui/Toast'
+import { ImportDocumentModal, type ExtractedDocument } from '@/components/ui/ImportDocumentModal'
 
 interface Bill {
   id: string
@@ -25,12 +27,15 @@ interface Bill {
 
 export function BillsPage() {
   const { isAccountant, user } = useAuth()
+  const toast = useToast()
   const [bills, setBills] = useState<Bill[]>([])
   const [contacts, setContacts] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showImport, setShowImport] = useState(false)
   const [form, setForm] = useState({
     contact_id: '', issue_date: new Date().toISOString().split('T')[0], due_date: '', notes: '',
     items: [{ description: '', quantity: 1, unit_price: 0, tax_rate: 0 }],
@@ -76,8 +81,37 @@ export function BillsPage() {
   }
 
   async function updateStatus(id: string, status: BillStatus) {
-    await supabase.from('bills').update({ status }).eq('id', id)
+    const { error } = await supabase.from('bills').update({ status }).eq('id', id)
+    if (error) toast.error('Update failed', error.message)
+    else toast.success('Bill marked as paid')
     load()
+  }
+
+  async function handleDelete(id: string, number: string) {
+    if (!confirm(`Delete bill ${number}? This cannot be undone.`)) return
+    setDeletingId(id)
+    await supabase.from('bill_items').delete().eq('bill_id', id)
+    const { error } = await supabase.from('bills').delete().eq('id', id)
+    if (error) toast.error('Delete failed', error.message)
+    else toast.success('Bill deleted')
+    setDeletingId(null); load()
+  }
+
+  function handleExtracted(doc: ExtractedDocument) {
+    const vendor = contacts.find(c => c.name.toLowerCase() === (doc.vendor_name ?? '').toLowerCase())
+    setForm(f => ({
+      ...f,
+      contact_id: vendor?.id ?? '',
+      issue_date: doc.issue_date ?? f.issue_date,
+      due_date: doc.due_date ?? '',
+      notes: doc.notes ?? '',
+      items: doc.line_items?.length
+        ? doc.line_items.map(li => ({ description: li.description, quantity: li.quantity, unit_price: li.unit_price, tax_rate: li.tax_rate }))
+        : f.items,
+    }))
+    setShowImport(false)
+    setShowForm(true)
+    toast.success('Document imported', 'Review the pre-filled form and save')
   }
 
   const filtered = bills.filter(b =>
@@ -85,14 +119,20 @@ export function BillsPage() {
   )
 
   return (
+    <>
     <div>
       <PageHeader
         title="Bills"
         description="Manage vendor bills and accounts payable"
         actions={isAccountant && (
-          <Button onClick={() => setShowForm(!showForm)} size="sm">
-            <Plus className="w-3.5 h-3.5" /> New Bill
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>
+              <Sparkles className="w-3.5 h-3.5" /> Import from Document
+            </Button>
+            <Button onClick={() => setShowForm(!showForm)} size="sm">
+              <Plus className="w-3.5 h-3.5" /> New Bill
+            </Button>
+          </div>
         )}
       />
 
@@ -184,9 +224,16 @@ export function BillsPage() {
                   <Td right mono style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(bill.total)}</Td>
                   <Td><Badge {...statusBadge(bill.status)}>{bill.status}</Badge></Td>
                   <Td>
-                    {isAccountant && bill.status === 'received' && (
-                      <button className="text-xs font-medium px-2 py-1 rounded-md transition-colors hover:bg-emerald-50" style={{ color: '#16a34a' }} onClick={() => updateStatus(bill.id, 'paid')}>Mark paid</button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {isAccountant && bill.status === 'received' && (
+                        <button className="text-xs font-medium px-2 py-1 rounded-md transition-colors hover:bg-emerald-50" style={{ color: '#16a34a' }} onClick={() => updateStatus(bill.id, 'paid')}>Mark paid</button>
+                      )}
+                      {isAccountant && (
+                        <button onClick={() => handleDelete(bill.id, bill.number)} disabled={deletingId === bill.id} className="p-1.5 rounded-md hover:bg-red-50 transition-colors disabled:opacity-40" title="Delete" style={{ color: '#ef4444' }}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </Td>
                 </DataRow>
               ))}
@@ -195,5 +242,13 @@ export function BillsPage() {
         </Card>
       </div>
     </div>
+
+    {showImport && (
+      <ImportDocumentModal
+        onExtracted={handleExtracted}
+        onClose={() => setShowImport(false)}
+      />
+    )}
+    </>
   )
 }

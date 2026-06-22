@@ -32,13 +32,22 @@ export function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0d1117' }}>
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2.5 mb-10 justify-center">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}>
-            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-              <rect x="1" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
-              <rect x="7" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#1e1b4b' }}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <rect x="9.25" y="11" width="1.5" height="6" rx="0.75" fill="#fbbf24"/>
+              <rect x="6" y="16" width="8" height="1.5" rx="0.75" fill="rgba(251,191,36,0.4)"/>
+              <rect x="3.5" y="8.5" width="13" height="1.5" rx="0.75" fill="#fbbf24"/>
+              <line x1="4.5" y1="10" x2="3.5" y2="13.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="1" y="13" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              <line x1="15.5" y1="10" x2="16.5" y2="12.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+              <rect x="14" y="12" width="5" height="1.25" rx="0.625" fill="rgba(251,191,36,0.55)"/>
+              <circle cx="10" cy="8.5" r="1.5" fill="#fde68a"/>
             </svg>
           </div>
-          <span className="font-semibold text-white">Ledger Lite</span>
+          <div>
+            <p className="text-sm font-semibold leading-tight" style={{ color: '#f1f5f9', letterSpacing: '-0.01em' }}>Ledger Lite</p>
+            <p className="text-xs leading-tight mt-0.5" style={{ color: 'rgba(148,163,184,0.7)' }}>Accounting</p>
+          </div>
         </div>
 
         <h1 className="text-2xl font-semibold mb-1 text-center" style={{ color: '#f1f5f9', letterSpacing: '-0.03em' }}>
