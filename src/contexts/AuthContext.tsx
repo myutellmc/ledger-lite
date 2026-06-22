@@ -16,6 +16,7 @@ interface AuthContextValue {
   session: Session | null
   profile: Profile | null
   loading: boolean
+  needsPasswordReset: boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false)
 
   async function fetchProfile(userId: string) {
     const { data } = await supabase
@@ -53,14 +55,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: unknown, session: Session | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: unknown, session: Session | null) => {
       setSession(session)
       setUser(session?.user ?? null)
+      if (event === 'PASSWORD_RECOVERY') {
+        setNeedsPasswordReset(true)
+        setLoading(false)
+        return
+      }
       if (session?.user) {
+        setNeedsPasswordReset(false)
         setLoading(true)
         fetchProfile(session.user.id)
       } else {
         setProfile(null)
+        setNeedsPasswordReset(false)
         setLoading(false)
       }
     })
@@ -103,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       signOut,
+      needsPasswordReset,
       isAdmin: profile?.role === 'admin',
       isAccountant: profile?.role === 'accountant' || profile?.role === 'admin',
     }}>
