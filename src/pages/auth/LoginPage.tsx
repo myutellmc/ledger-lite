@@ -41,11 +41,12 @@ export function LoginPage() {
     >
       {/* Left panel */}
       <div
-        className="hidden lg:flex lg:w-2/5 flex-col justify-between p-12"
+        className="hidden lg:flex lg:w-2/5 flex-col justify-center p-14"
         style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
       >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#1e1b4b' }}>
+        {/* Logo */}
+        <div className="flex items-center gap-3 mb-12">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', boxShadow: '0 2px 12px rgba(99,102,241,0.3)' }}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <rect x="9.25" y="11" width="1.5" height="6" rx="0.75" fill="#fbbf24"/>
               <rect x="6" y="16" width="8" height="1.5" rx="0.75" fill="rgba(251,191,36,0.4)"/>
@@ -58,27 +59,46 @@ export function LoginPage() {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold leading-tight" style={{ color: '#f1f5f9', letterSpacing: '-0.01em' }}>Ledger Lite</p>
-            <p className="text-xs leading-tight mt-0.5" style={{ color: 'rgba(148,163,184,0.7)' }}>Accounting</p>
+            <p className="text-base font-bold leading-tight" style={{ color: '#f1f5f9', letterSpacing: '-0.02em' }}>Ledger Lite</p>
+            <p className="text-xs leading-tight mt-0.5" style={{ color: 'rgba(148,163,184,0.5)' }}>Zambia · ZMW · ZRA Compliant</p>
           </div>
         </div>
 
-        <div>
-          <blockquote className="text-2xl font-light leading-relaxed mb-8" style={{ color: 'rgba(241,245,249,0.85)', letterSpacing: '-0.02em' }}>
-            "Simple, clean accounting that gets out of your way."
-          </blockquote>
-          <div className="flex items-center gap-6">
-            {[
-              { label: 'Double-entry', desc: 'bookkeeping' },
-              { label: 'Real-time', desc: 'reporting' },
-              { label: 'Role-based', desc: 'access control' },
-            ].map(({ label, desc }) => (
-              <div key={label}>
-                <p className="text-sm font-semibold" style={{ color: '#e0e7ff' }}>{label}</p>
-                <p className="text-xs mt-0.5" style={{ color: 'rgba(100,116,139,0.9)' }}>{desc}</p>
+        {/* Headline + quote */}
+        <div className="mb-10">
+          <h2 className="text-3xl font-bold leading-tight mb-4" style={{ color: '#f1f5f9', letterSpacing: '-0.04em' }}>
+            Your finances,<br />under control.
+          </h2>
+          <p className="text-sm leading-relaxed" style={{ color: 'rgba(148,163,184,0.7)' }}>
+            Cloud accounting built for Zambian small businesses — quotes, invoices, inventory, payroll, and ZRA-compliant reporting in one place.
+          </p>
+        </div>
+
+        {/* Module list */}
+        <div className="space-y-3 mb-10">
+          {[
+            { icon: '📝', label: 'Quotes & Invoices', desc: 'Send, track, and get paid faster' },
+            { icon: '📦', label: 'Inventory', desc: 'Stock levels linked to every sale' },
+            { icon: '💼', label: 'Payroll', desc: 'PAYE, NAPSA & NHIMA auto-calculated' },
+            { icon: '📈', label: 'Reports', desc: 'P&L, balance sheet, cash flow' },
+          ].map(({ icon, label, desc }) => (
+            <div key={label} className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ fontSize: '18px', lineHeight: 1 }}>{icon}</span>
+              <div>
+                <p className="text-sm font-semibold leading-tight" style={{ color: '#e0e7ff' }}>{label}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(100,116,139,0.8)' }}>{desc}</p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer badges */}
+        <div className="flex items-center gap-4">
+          {['Double-entry bookkeeping', 'Real-time reporting', 'Role-based access'].map(t => (
+            <span key={t} className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.12)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
+              {t}
+            </span>
+          ))}
         </div>
       </div>
 
